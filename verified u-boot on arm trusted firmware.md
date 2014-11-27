@@ -74,7 +74,7 @@ Compile U-boot as below:
 
     $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- distclean  
     
-    $make vexpress_aemv8a_config_config
+    $make vexpress_aemv8a_config
     The latest version you should use vexpress_aemv8a_defconfig
     
     $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- all
