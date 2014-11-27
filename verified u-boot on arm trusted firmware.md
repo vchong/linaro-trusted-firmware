@@ -4,14 +4,36 @@ It can be downloaded from [ARM][] .
 [ARM]: http://www.arm.com/zh/products/tools/models/fast-models/foundation-model.php      "ARM"
 
 2. Linux server  
-Host working environment, my environment is ubuntu 12.04.04
+Host working environment, my environment is ubuntu 14.04
 
-3. Cross compiler: gcc-linaro-aarch64-none-elf-4.8-2013.11_linux.tar.xz  
+3. Cross compiler: gcc-linaro-aarch64-none-elf-4.9-2014.09_linux.tar.xz  
 
 #Prepare Software  
+Prepare RAM-disk
+
+To prepare a RAM-disk root file-system, do the following:
+
+    Download the file-system image:
+
+    wget http://releases.linaro.org/14.10/openembedded/aarch64/linaro-image-minimal-genericarmv8-20141023-717.rootfs.tar.gz
+
+    Modify the Linaro image:
+
+    # Prepare for use as RAM-disk. Normally use MMC, NFS or VirtioBlock.
+    # Be careful, otherwise you could damage your host file-system.
+    mkdir tmp; cd tmp
+    sudo sh -c "zcat ../linaro-image-lamp-genericarmv8-20140727-701.rootfs.tar.gz | cpio -id"
+    sudo ln -s sbin/init .
+    sudo sh -c "echo 'devtmpfs /dev devtmpfs mode=0755,nosuid 0 0' >> etc/fstab"
+    sudo sh -c "find . | cpio --quiet -H newc -o | gzip -3 -n > ../filesystem.cpio.gz"
+    cd ..
+
+    Copy the resultant filesystem.cpio.gz to the directory where the FVP is launched from. Alternatively a symbolic link may be used.
+
 1. RAM-disk initrd
-Test version can be getted from linaro, Details can be found on ARM-Trusted-Firmware's [Guide][] .   
+Test version can be obtained from linaro. Details can be found on ARM-Trusted-Firmware's [Guide][] .   
 [Guide]: https://github.com/xiaoqiangdu/arm-trusted-firmware/blob/master/docs/user-guide.md   "user guide"
+
 2. Linux kernel
 
 3. Arm Trusted Firmware
@@ -28,7 +50,9 @@ git clone git://git.denx.de/u-boot.git
 We need to run system on Foundation, So my target board is vexpress_aemv8a.   
 vexpress_aemv8a_semi_config can be selected when you run on FVP platform.  
 Modify macro CONFIG_SYS_TEXT_BASE which locate in include/configs/vexpress_aemv8a.h file,   
-for BL31 will jump to address 0x88000000, CONFIG_SYS_TEXT_BASE should be modified to this value.  
+for BL31 will jump to address 0x88000000, CONFIG_SYS_TEXT_BASE should be modified to this value.
+
+NOTE: If your u-boot repo is new enough, ARM-TF support is already there, i.e. CONFIG_SYS_TEXT_BASE already = 0x88000000
 
 Compile Uboot as bellow:  
     $cd uboot  
@@ -39,22 +63,54 @@ Compile Uboot as bellow:
 
     $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- all
 
-###2)Make uImage  
-Supposed that linux image has created   
+###2)Make uImage
+
+####2.1)Obtaining a Linux kernel
+
+Preparing a Linux kernel for use on the FVPs can be done as follows (GICv2 support only):
+
+    Clone Linux:
+
+    git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+
+    Not all required features are available in the kernel mainline yet. These can be obtained from the ARM-software EDK2 repository instead:
+
+    cd linux
+    git remote add -f --tags arm-software https://github.com/ARM-software/linux.git
+    git checkout --detach 1.1-Juno
+
+    Build with the Linaro GCC tools.
+
+    # in linux/
+    make mrproper
+    make ARCH=arm64 defconfig
+
+    CROSS_COMPILE=<path-to-aarch64-gcc>/bin/aarch64-none-elf- \
+    make -j6 ARCH=arm64
+
+The compiled Linux image will now be found at arch/arm64/boot/Image.
+
+####2.2)Supposed that linux image has created   
 
     $cd  <linux_kernel_path>/arch/arm64/boot   
     $/<uboot_path>/tools/mkimage -A arm64 -O linux -T kernel -C none -a 0x80080000 -e 0x80080000  -n 'linux-3.15' -d           Image uImage   
-    
+
+NOTE: What if linux is NOT 3.15?
+
 Both load address and link address are 0x80080000.
 
-###3)Make firmware Package   
+###3)Make ARM-TF Package
 Firmware package includes: bl1.bin/ bl2.bin/ bl31.bin/ bl33.bin(uboot.bin)
-    Set variable BL33 as <path_to_uboot_directory>/uboot.bin  
+    $git clone https://github.com/ARM-software/arm-trusted-firmware.git
+    $cd arm-trusted-firmware
     $cd <firmware_path>  
-    $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- PLAT=fvp BL33=<path_to_uboot_directory>/uboot.bin all fip.bin
+    Set variable BL33 as <path_to_uboot_directory>/uboot.bin  
+    $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- PLAT=fvp BL33=<path_to_uboot_directory>/u-boot.bin all fip #NOT fip.bin!!!
 
 ###4)Running system   
-+ Copy all of these images including bl1.bin/fip.bin/uImage/ramdisk/fdt blob to work directory,then enter.   
++ Copy all of these images including bl1.bin/fip.bin/uImage/ramdisk/fdt blob to work directory,then enter.
++ NOTE: Which fdt should we use? arm-trusted-firmware/fdts/fvp-foundation-gicv2-psci.dtb?
+The default use-case for the Foundation FVP is to enable the GICv3 device in the model but use the GICv2 FDT, in order for Linux to drive the GIC in GICv2 emulation mode.
 + Starting Foundation as bellow:  
 $/<path_to_fvp>/Foundation_v8       \  
  --cores=4                 \  
