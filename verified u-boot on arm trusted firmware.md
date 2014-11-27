@@ -31,36 +31,52 @@ To prepare a RAM-disk root file-system, do the following:
     Copy the resultant filesystem.cpio.gz to the directory where the FVP is launched from. Alternatively a symbolic link may be used.
 
 1. RAM-disk initrd
-Test version can be obtained from linaro. Details can be found on ARM-Trusted-Firmware's [Guide][] .   
+Test version can be obtained from linaro. Details can be found on ARM-Trusted-Firmware's [Guide][].   
 [Guide]: https://github.com/xiaoqiangdu/arm-trusted-firmware/blob/master/docs/user-guide.md   "user guide"
 
 2. Linux kernel
 
 3. Arm Trusted Firmware
 
-4. Uboot: Universal boot loader
-The latest version of Uboot can be downloaded from [UBoot][], or    
+4. U-boot: Universal boot loader
+The latest version of U-boot can be downloaded from [U-boot][], or    
 git clone git://git.denx.de/u-boot.git
 
-[uboot]: http://git.denx.de/cgi-bin/gitweb.cgi?p=u-boot.git;a=summary  "UBoot"
+[U-boot]: http://git.denx.de/cgi-bin/gitweb.cgi?p=u-boot.git;a=summary  "U-boot"
 
 #Boot system   
 
-###1)Build Uboot  
-We need to run system on Foundation, So my target board is vexpress_aemv8a.   
+###1)Build U-boot  
+We need to run system on Foundation, so my target board is vexpress_aemv8a.   
 vexpress_aemv8a_semi_config can be selected when you run on FVP platform.  
 Modify macro CONFIG_SYS_TEXT_BASE which locate in include/configs/vexpress_aemv8a.h file,   
 for BL31 will jump to address 0x88000000, CONFIG_SYS_TEXT_BASE should be modified to this value.
 
 NOTE: If your u-boot repo is new enough, ARM-TF support is already there, i.e. CONFIG_SYS_TEXT_BASE already = 0x88000000
 
-Compile Uboot as bellow:  
-    $cd uboot  
+Compile U-boot as below:
+
+    $cd u-boot
+    $git checkout v2014.07
+    $vim include/configs/vexpress_aemv8a.h
+
+    Add the following 4 lines after the '#ifndef CONFIG_BASE_FVP' section below:
+    
+    #ifndef CONFIG_BASE_FVP
+    /* Base FVP not using GICv3 yet */
+    #define CONFIG_GICV3
+    #endif
+    
+    + #ifdef CONFIG_GICV3
+    + #undef CONFIG_GICV3
+    + #endif
+    + #define CONFIG_GICV2
+
     $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- distclean  
     
-    $make vexpress_aemv8a_config    
-    The latest version you should use vexpress_aemv8a_defconfig   
-
+    $make vexpress_aemv8a_config_config
+    The latest version you should use vexpress_aemv8a_defconfig
+    
     $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- all
 
 ###2)Make uImage
@@ -93,22 +109,22 @@ The compiled Linux image will now be found at arch/arm64/boot/Image.
 ####2.2)Supposed that linux image has created   
 
     $cd  <linux_kernel_path>/arch/arm64/boot   
-    $/<uboot_path>/tools/mkimage -A arm64 -O linux -T kernel -C none -a 0x80080000 -e 0x80080000  -n 'linux-3.15' -d           Image uImage   
+    $/<u-boot_path>/tools/mkimage -A arm64 -O linux -T kernel -C none -a 0x80080000 -e 0x80080000  -n 'linux-3.15' -d           Image uImage   
 
 NOTE: What if linux is NOT 3.15?
 
 Both load address and link address are 0x80080000.
 
 ###3)Make ARM-TF Package
-Firmware package includes: bl1.bin/ bl2.bin/ bl31.bin/ bl33.bin(uboot.bin)
+Firmware package includes: bl1.bin/ bl2.bin/ bl31.bin/ bl33.bin(u-boot.bin)
+
     $git clone https://github.com/ARM-software/arm-trusted-firmware.git
     $cd arm-trusted-firmware
-    $cd <firmware_path>  
-    Set variable BL33 as <path_to_uboot_directory>/uboot.bin  
-    $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- PLAT=fvp BL33=<path_to_uboot_directory>/u-boot.bin all fip #NOT fip.bin!!!
+    Set variable BL33 as <path_to_u-boot_directory>/u-boot.bin  
+    $make CROSS_COMPILE=<path>/bin/aarch64-none-elf- PLAT=fvp BL33=<path_to_u-boot_directory>/u-boot.bin all fip #NOT fip.bin!!!
 
 ###4)Running system   
-+ Copy all of these images including bl1.bin/fip.bin/uImage/ramdisk/fdt blob to work directory,then enter.
++ Copy all of these images including bl1.bin/fip.bin/uImage/filesystem.cpio.gz/fdt blob to work directory,then enter.
 + NOTE: Which fdt should we use? arm-trusted-firmware/fdts/fvp-foundation-gicv2-psci.dtb?
 The default use-case for the Foundation FVP is to enable the GICv3 device in the model but use the GICv2 FDT, in order for Linux to drive the GIC in GICv2 emulation mode.
 + Starting Foundation as bellow:  
@@ -120,11 +136,11 @@ $/<path_to_fvp>/Foundation_v8       \
 --data=bl1.bin@0x0        \  
 --data=fip.bin@0x8000000  \  
 --data=uImage@0x90000000 \  
---data=ramdisk_file@0xa1000000 \  
+--data=filesystem.cpio.gz@0xa1000000 \  
 --data=fdt.dtb@0xa0000000   
 PS: --data command can be used to load image into FVP’s memory
-Boot kernel. Once firmware successfully started, System will stop at uboot’s shell environment. 
-+ We can use UBOOT’s bootm command to start linux kernel as below:  
+Boot kernel. Once firmware successfully started, System will stop at u-boot’s shell environment. 
++ We can use U-boot’s bootm command to start linux kernel as below:  
 
     $bootm 0x90000000 0xa1000000:size 0xa0000000.  
 
@@ -141,7 +157,7 @@ Edit vexpress_aemv8a.h file, add macros as below:
     CONFIG_FIT  
     CONFIG_OF_SEPARATE    
 
-There may exit some compile problem for lack of gpio.h file, this is caused by Uboot's dependency design.  
+There may exit some compile problem for lack of gpio.h file, this is caused by U-boot's dependency design.  
 We need to add a empty gpio.h file to the path arch\arm\include\asm\arch-armv8, just like other boards.  
 
 + Generate RSA Key pairs with openssl tools  
@@ -221,7 +237,7 @@ FIT file sample as bellow
 Pay attention to section key-name-hint, This point to the path of key  generated before.  
 Before we build FIT image, kernel image , FDT blob and ramdisk should be prepared.  
 Details configure information depends on your own board, you need to select load address   
-and entry address for each sub image. Build FIT image and signed the dtb file for Uboot as below:  
+and entry address for each sub image. Build FIT image and signed the dtb file for U-boot as below:  
 
     $ cp fvp-psci-gicv2.dtb atf_psci_public.dtb  
     $ mkimage -D "-I dts -O dtb -p 2000" -f kernel.its -k <path_to_key> -K atf_psci_public.dtb -r image.fit  
@@ -236,7 +252,7 @@ I selected fvp-psci-gicv2.dtb that located in firmware's dts directory to be sig
     $ make CROSS_COMPILE=<> DEVICE_TREE=foundation all  
     $ make CROSS_COMPILE=<> EXT_DTB=<dtb file>  
 
-Note that, I copied device tree file foundation.dts to Uboot's arch/arm/dts file,   
+Note that, I copied device tree file foundation.dts to U-boot's arch/arm/dts file,   
 and made corresponding modifications to the Makefile.This is the object what DEVICE_TREE point to.    
 EXT_DTB is the dtb file that we signed before in make FIT image step: atf_psci_public.dtb.   
 After this step was completed, public key was held on device tree.  
@@ -264,8 +280,10 @@ After loaded images are verified, Use bootm command to boot kernel as :
 
     $bootm 0xB0000004  
 
-PS: There exist some problems in he latest version of Uboot(v2014.10),  
-You may need to roll back gic_v64.S file as the older version when you open CONFIG_GICV2 macro.  
-Although I have feedbacked the problem to Uboot's maintainer, still I recommend you   
-to use the older version of Uboot if you want to verified on Foundation platform currently.  
-Or you can substitude gic_v64.S file with the older version and add CONFIG_GICV2 macro in vexpress_aemv8a.h.
+PS: There exist some problems in the latest version of U-boot (v2014.10),  
+You may need to roll back gic_64.S file as the older version when you open CONFIG_GICV2 macro.  
+Although I have feedbacked the problem to U-boot's maintainer, still I recommend you   
+to use the older version of U-boot if you want to verified on Foundation platform currently.  
+Or you can substitude gic_64.S file with the older version and add CONFIG_GICV2 macro in vexpress_aemv8a.h.
+
+NOTE: WHERE IS THE OLDER VERSION???
