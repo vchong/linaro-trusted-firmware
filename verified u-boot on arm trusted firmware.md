@@ -147,10 +147,21 @@ PS: --data command can be used to load image into FVP’s memory
 Boot kernel. Once firmware successfully started, System will stop at u-boot’s shell environment. 
 + We can use U-boot’s bootm command to start linux kernel as below:  
 
-    $bootm 0x90000000 0xa1000000:size 0xa0000000.  
+    $bootm 0x90000000 0xa1000000:size 0xa0000000
+    $boot
 
 0x90000000 is kernel’s address, 0xa0000000 is device tree dtb’s address,   
-and 0xa1000000 is ramdisk’s address, we also need to fill in ramdisk size.  
+and 0xa1000000 is ramdisk’s address, we also need to fill in ramdisk size.
+
+NOTE: size in what unit? kb, i.e. roughly the size of 'll' command / 1000
+
++ Alternatively, use command below so you don't have to mess with size calculations:
+
+    $ bootm 0x90000000 - 0xa0000000
+
+This maps to:
+
+bootm ${kernel_addr} ${ramdisk_addr} ${fdt_addr}
 
 ###5. Verified U-boot  
 + Since I verified it on Foundation platform, So I choice vexpress_aemv8a as the target board for U-Boot.
