@@ -31,7 +31,7 @@ To prepare a RAM-disk root file-system, do the following:
     Copy the resultant filesystem.cpio.gz to the directory where the FVP is launched from. Alternatively a symbolic link may be used.
 
 1. RAM-disk initrd
-Test version can be obtained from linaro. Details can be found on ARM-Trusted-Firmware's [Guide][].   
+Test version can be obtained from linaro. Details can be found on ARM-Trusted-Firmware's [Guide][] or follow above instructions.   
 [Guide]: https://github.com/xiaoqiangdu/arm-trusted-firmware/blob/master/docs/user-guide.md   "user guide"
 
 2. Linux kernel
