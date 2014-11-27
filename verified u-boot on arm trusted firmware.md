@@ -60,6 +60,11 @@ Compile U-boot as below:
     $git checkout v2014.07
     $vim include/configs/vexpress_aemv8a.h
 
+    Add the following 2 lines after '#define DEBUG':
+
+    + #define CONFIG_SEMIHOSTING
+    + #define CONFIG_BASE_FVP
+
     Add the following 4 lines after the '#ifndef CONFIG_BASE_FVP' section below:
     
     #ifndef CONFIG_BASE_FVP
